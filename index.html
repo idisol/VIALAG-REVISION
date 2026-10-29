@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RE-visión</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="img/favicon-192.png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<meta name="description" content="Revisión de planos (PDF o DXF) con notas que siguen vivas entre versiones. Los archivos se procesan en el navegador.">
+<link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+<div class="app">
+  <header class="bar">
+    <div class="brand"><img class="logo" alt="VIALAG" width="872" height="100" src="img/logo-vialag.png"></div>
+    <div class="legend" id="legend">
+      <span><i class="sw" style="background:#969ca3"></i>Coincide</span>
+      <span><i class="sw" style="background:#ed4133"></i>Cambio</span>
+      <span><i class="nsw"></i>Nota</span>
+      <span><i class="gsw">!</i>Grave</span>
+    </div>
+    <div class="privacy">Los archivos se procesan en tu navegador y no se suben a ningún servidor.</div>
+  </header>
+
+  <aside class="panel">
+    <div class="sec">
+      <h1 class="ptitle"><span class="ptitle-t">RE-VISIÓN<span class="appver" title="Versión de RE-visión">V01</span></span></h1>
+      <div class="fields">
+        <label class="fld"><span>Proyecto</span><input id="fProyecto" type="text" maxlength="120" autocomplete="off"></label>
+        <label class="fld"><span>Detalle</span><input id="fDetalle" type="text" maxlength="120" autocomplete="off"></label>
+        <label class="fld"><span>Creador</span><input id="fCreador" type="text" maxlength="80" autocomplete="off"></label>
+        <label class="fld"><span>Revisor</span><input id="fRevisor" type="text" maxlength="80" autocomplete="off"></label>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sechead"><h2>Versiones</h2><button class="linkbtn alignlink" id="alignBtn" type="button" hidden>Alinear con dos puntos</button></div>
+      <div class="vers" id="vers"></div>
+      <div class="addrow">
+        <button class="btn primary" id="addVer" type="button">Elegir plano</button>
+        <button class="linkbtn" id="openRev" type="button">Abrir una revisión guardada</button>
+      </div>
+    </div>
+
+    <div class="sec switchsec">
+      <div class="switches" role="group" aria-label="Qué se compara">
+        <button class="switch" id="hatchBtn" type="button" role="switch" aria-checked="true" title="Comparar los hatchs"><span class="track" aria-hidden="true"></span>Hatchs</button>
+        <button class="switch" id="annotBtn" type="button" role="switch" aria-checked="true" title="Comparar ejes, cotas, textos, niveles y marcas de corte y elevación"><span class="track" aria-hidden="true"></span>Elementos de anotación</button>
+      </div>
+    </div>
+
+    <div class="sec card" id="resultSec" hidden>
+      <div class="score" id="scoreRow" hidden>
+        <div class="pct" id="pct">–</div>
+        <span class="lbl pre" id="pctLbl">Cambios entre versiones indicados en rojo</span>
+      </div>
+      <div class="dlgrid">
+        <button class="btn" id="dlPdf" type="button" disabled>Descargar PDF</button>
+        <button class="btn" id="dlDxf" type="button" disabled>Descargar DXF</button>
+        <button class="btn span2" id="saveRev" type="button" disabled>Guardar revisión</button>
+      </div>
+      <p class="hint" id="saveHint"></p>
+      <p class="hint" id="dlHint"></p>
+    </div>
+
+    <div class="sec card" id="notesSec" hidden>
+      <h2>Notas</h2>
+      <p class="hint" id="notesHint">Carga un plano para empezar a dejar notas.</p>
+      <div class="nlist" id="noteList"></div>
+      <button class="btn wide" id="showChecked" type="button" aria-pressed="false" hidden>Ver notas en check</button>
+    </div>
+    <a class="credit-m" href="https://www.vialag.com/" target="_blank" rel="noopener">Desarrollado por VialAG</a>
+  </aside>
+
+  <section class="stage">
+    <div class="toolbar">
+      <div class="tleft">
+        <div class="seg" role="group" aria-label="Vista" id="viewSeg" hidden>
+          <button type="button" data-view="diff" aria-pressed="true">Comparación</button>
+          <button type="button" data-view="A" aria-pressed="false" id="viewA">Anterior</button>
+          <button type="button" data-view="B" aria-pressed="false" id="viewB">Nueva</button>
+        </div>
+        
+      </div>
+      <div class="mainbtns" role="group" aria-label="Acciones">
+        <button class="mb add" id="addNote" type="button" aria-pressed="false" disabled>Agregar <b>NOTA</b></button>
+        <button class="mb rep" id="verInforme" type="button" disabled>Ver <b>INFORME</b></button>
+      </div>
+      <div class="zoombox">
+        <button class="btn" id="zOut" type="button" aria-label="Alejar">−</button>
+        <button class="btn" id="zFit" type="button">Ajustar</button>
+        <button class="btn" id="zIn" type="button" aria-label="Acercar">+</button>
+      </div>
+    </div>
+    <div class="viewport" id="vp">
+      <div class="hint-bar" id="hint" role="status" hidden></div>
+      <div class="noteedit" id="noteEdit" hidden>
+        <div class="nehead"><span id="noteLbl">Nota</span><span class="nemeta" id="noteMeta"></span></div>
+        <textarea id="noteText" rows="3" maxlength="800" placeholder="Escribe la observación. Puedes pegar una imagen con Ctrl+V."></textarea>
+        <div class="nerow">
+          <button class="gravebtn" id="noteGrave" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2Z"/><path class="ex" d="M12 9.5v5M12 17.2v.3"/></svg>Grave</button>
+          <span class="sep"></span>
+          <button class="pen r" type="button" data-pen="r" aria-pressed="false" title="Dibuja en rojo dentro de la región"><i></i>Rojo</button>
+          <button class="pen b" type="button" data-pen="b" aria-pressed="false" title="Dibuja en azul dentro de la región"><i></i>Azul</button>
+          <button class="ico" type="button" id="noteImg" title="Adjuntar imagen (también puedes pegarla con Ctrl+V)" aria-label="Adjuntar imagen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.5 12.2 19.8a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></svg></button>
+          <button class="ico" type="button" id="penUndo" title="Borrar el último trazo" aria-label="Borrar el último trazo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+          <input type="file" id="imgFile" accept="image/*" hidden>
+        </div>
+        <div class="nethumb" id="noteThumb" hidden>
+          <button type="button" class="thumb" id="noteThumbBtn" title="Ver más grande"><img id="noteThumbImg" alt="Imagen adjunta a la nota"></button>
+          <button type="button" class="thx" id="noteImgDel" title="Quitar la imagen" aria-label="Quitar la imagen">×</button>
+        </div>
+        <p class="nechg" id="noteChg" hidden></p>
+        <div class="nebtns">
+          <button class="btn check" id="noteCheck" type="button">✓ Check</button>
+          <button class="ico del" id="noteDel" type="button" title="Eliminar la nota" aria-label="Eliminar la nota"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+          <span class="grow"></span>
+          <button class="txtbtn" id="noteCancel" type="button">Cancelar</button>
+          <button class="btn save" id="noteOk" type="button">Guardar</button>
+        </div>
+      </div>
+      <div class="empty" id="empty">
+        <button class="loica-btn" id="loicaBtn" type="button" title="Elegir el plano que quieres revisar" aria-label="Elegir el plano que quieres revisar">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 290 1024 820" fill="none" class="loica-lupa loica-animated loica-canto" data-msg="drag" role="img" aria-labelledby="loica-lupa-title loica-lupa-desc">
+  <title id="loica-lupa-title">ARRASTRA AQUÍ EL PLANO QUE QUIERES REVISAR</title>
+  <desc id="loica-lupa-desc">Loica de VialAG con lupa. Alterna de golpe entre la lupa y el frente, abre y cierra el pico al mirar la lupa y mueve el ala. Al tocarle la cabeza, canta.</desc>
+  <style>.loica-lupa .loica-lupa-still{display:none}
+@media(prefers-reduced-motion:reduce){.loica-lupa .loica-lupa-motion{display:none}.loica-lupa .loica-lupa-still{display:inline}}
+/* Cartel de abajo: la página elige el mensaje con data-msg (arrastrar, espera, tímido). */
+.loica-animated .loica-message{opacity:0}
+.loica-animated[data-msg="drag"] .loica-message-drag,.loica-animated[data-msg="wait"] .loica-message-wait,.loica-animated[data-msg="shy"] .loica-message-shy{opacity:1}
+.loica-lupa .loica-bird{cursor:pointer}
+/* Canto: la página detiene la animación SMIL en la pose de la lupa y agrega is-singing mientras suena el canto. */
+.loica-canto.is-singing #loica-lupa-cabeza{transform-box:fill-box;transform-origin:71% 91%;animation:lupa-canto-cabeza 1.92s ease-in-out infinite}
+.loica-canto.is-singing #loica-lupa-cabeza-lateral{opacity:1!important}
+.loica-canto.is-singing #loica-lupa-cabeza-frontal{opacity:0!important}
+.loica-canto.is-singing #loica-lupa-pico-cerrado{animation:lupa-canto-cerrado .96s steps(1,end) infinite}
+.loica-canto.is-singing #loica-lupa-pico-medio{animation:lupa-canto-medio .96s steps(1,end) infinite}
+.loica-canto.is-singing #loica-lupa-pico-abierto{animation:lupa-canto-abierto .96s steps(1,end) infinite}
+@keyframes lupa-canto-cabeza{0%,100%{transform:rotate(0deg)}25%{transform:rotate(5deg)}75%{transform:rotate(-2deg)}}
+@keyframes lupa-canto-cerrado{0%{opacity:1}25%{opacity:0}100%{opacity:0}}
+@keyframes lupa-canto-medio{0%{opacity:0}25%{opacity:1}50%{opacity:0}75%{opacity:1}100%{opacity:1}}
+@keyframes lupa-canto-abierto{0%{opacity:0}50%{opacity:1}75%{opacity:0}100%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.loica-canto.is-singing #loica-lupa-cabeza{animation:none}}</style>
+  <g class="loica-escala" transform="matrix(0.75 0 0 0.75 144 203.75)">
+  <g stroke="#302D24" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <g id="loica-lupa-cola">
+      <path d="M633 658 731 650 805 807 714 814 Z" fill="#7F7059" />
+      <path d="M674 692 734 808 M705 685 769 808" stroke="#B6A88C" stroke-width="13" />
+    </g>
+    <g id="loica-lupa-ala-izquierda">
+      <path d="M392 378 C354 416 316 445 273 469 C239 486 217 500 209 516 L245 612 C304 612 337 589 359 553 C365 488 374 430 392 378 Z" fill="#766C55" />
+      <path d="M359 444 C327 481 283 514 243 528" stroke="#AEA185" stroke-width="7" />
+      <path d="M348 448 328 463 M297 480 276 492 M252 515 238 525" stroke="#EDE3C5" stroke-width="13" />
+      <path d="M337 509 320 518 M325 552 312 559" stroke="#423C2E" stroke-width="7" />
+    </g>
+    <g id="loica-lupa-lupa">
+      <path d="M194 450 219 440 320 650 Q327 666 307 677 Q291 686 282 666 Z" fill="#C7BBA0" />
+      <path d="M202 473 228 462 M210 491 237 479 M281 662 Q300 667 314 655" stroke="#645B47" stroke-width="7" />
+      <g transform="rotate(-17 151 335)">
+        <ellipse cx="164" cy="335" rx="99" ry="134" fill="#A89A7C" />
+        <path d="M232 264 252 264 M251 345 267 345 M244 365 262 365" stroke="#554C39" stroke-width="6" />
+        <ellipse cx="149" cy="335" rx="98" ry="132" fill="#82765E" />
+        <ellipse cx="147" cy="334" rx="87" ry="120" stroke="#AEA185" stroke-width="6" />
+        <ellipse cx="149" cy="335" rx="74" ry="107" fill="#FFFFFF" />
+      </g>
+      <path d="M105 276 C93 300 97 328 109 352 M125 378 131 389" stroke="#302D24" stroke-width="7" />
+    </g>
+    <g id="loica-lupa-cuerpo">
+      <path d="M401 365 C363 412 349 499 348 565 C347 652 389 704 455 724 C531 751 619 731 687 688 C728 660 729 603 705 534 C681 459 648 400 611 385 Z" fill="#7F7059" />
+      <path d="M412 375 C402 431 375 479 372 540 C367 612 388 671 431 701 C456 718 481 722 507 722 C551 704 583 668 607 619 C632 569 635 485 614 419 L591 396 L570 405 L550 385 L526 402 L505 386 L482 402 L461 383 L444 397 L428 372 Z" fill="#EA3E30" stroke="none" />
+      <path d="M442 434 437 451 M458 494 454 515 M449 565 451 583 M483 625 489 645" stroke="#443C2D" stroke-width="8" />
+    </g>
+    <g id="loica-lupa-prension">
+      <path d="M213 521 C232 520 260 507 280 515 C299 531 278 568 258 591 L234 616 C208 598 193 564 195 536 C195 528 201 524 213 521 Z" fill="#655D49" />
+      <path d="M235 610 252 600" stroke="#A29477" stroke-width="4" />
+    </g>
+    <g id="loica-lupa-cabeza" class="loica-lupa-motion loica-bird">
+      <g id="loica-lupa-cabeza-lateral" opacity="1">
+        <path d="M388 369 C398 326 391 277 398 234 C408 189 444 155 478 153 C519 147 550 165 581 194 C625 235 648 307 651 395 L625 385 L611 402 L589 383 L569 399 L548 380 L526 398 L506 379 L481 397 L463 377 L446 391 L430 361 Z" fill="#7F7059" />
+        <path fill="#EA3E30" stroke="none" d="M401.0000 234.0000 C426.0000 197.0000 464.0000 182.0000 498.0000 191.0000 C516.0000 195.0000 530.0000 202.0000 532.0000 214.0000 C520.0000 245.0000 517.0000 278.0000 517.0000 302.0000 L518.0000 346.0000 L496.0000 376.0000 L474.0000 354.0000 L442.0000 370.0000 L432.0000 348.0000 L393.0000 351.0000 Z" />
+        <path stroke="#EDE3C5" stroke-width="24" d="M501.0000 231.0000 C545.0000 245.0000 598.0000 287.0000 629.0000 343.0000" />
+        <path d="M436 238 C451 229 467 224 480 224" stroke="#EDE3C5" stroke-width="19" opacity="0" />
+        <path d="M553 199 561 209 M584 226 592 240 M563 286 567 303 M597 306 603 323" stroke="#403A2D" stroke-width="7.4" />
+        <circle cy="249" r="23.5" fill="#302D24" stroke="none" cx="473.0000" />
+        <circle cy="241" r="6.4" fill="#FFFFFF" stroke="none" cx="467.0000" />
+        <g opacity="0.0000">
+          <circle cy="249" r="21.5" fill="#302D24" stroke="none" cx="511.0000" />
+          <circle cy="241" r="5.8" fill="#FFFFFF" stroke="none" cx="505.0000" />
+        </g>
+        <g id="loica-lupa-pico">
+          <g id="loica-lupa-pico-cerrado" opacity="1">
+            <path d="M422.0000 212.0000 L193.0000 169.0000 L401.0000 280.0000 Z" fill="#C7BEA6" />
+            <path d="M398.3900 241.3800 L210.4800 175.1600" stroke-width="6.3" />
+            <animate attributeName="opacity" dur="12s" repeatCount="indefinite" values="1;0;0;0;1;0;0;0;1;0;0;0;1;1;1" keyTimes="0.00000000;0.07333333;0.08666667;0.10000000;0.11333333;0.24666667;0.26000000;0.27333333;0.28666667;0.37333333;0.38666667;0.40000000;0.41333333;0.50000000;1.00000000" calcMode="discrete" />
+          </g>
+          <g id="loica-lupa-pico-medio" opacity="0">
+            <path d="M411.5 246 L193 169 L188.1610 184.4294 Z" fill="#302D24" stroke="none" />
+            <path d="M422 212 L193 169 L411.5 246 Z" fill="#C7BEA6" />
+            <path d="M411.5 246 L193 169 L401 280 Z" fill="#C7BEA6" transform="rotate(-4 411.5 246)" />
+            <animate attributeName="opacity" dur="12s" repeatCount="indefinite" values="0;1;0;1;0;1;0;1;0;1;0;1;0;0;0" keyTimes="0.00000000;0.07333333;0.08666667;0.10000000;0.11333333;0.24666667;0.26000000;0.27333333;0.28666667;0.37333333;0.38666667;0.40000000;0.41333333;0.50000000;1.00000000" calcMode="discrete" />
+          </g>
+          <g id="loica-lupa-pico-abierto" opacity="0">
+            <path d="M411.5 246 L193 169 L183.6446 204.1289 Z" fill="#302D24" stroke="none" />
+            <path d="M422 212 L193 169 L411.5 246 Z" fill="#C7BEA6" />
+            <path d="M411.5 246 L193 169 L401 280 Z" fill="#C7BEA6" transform="rotate(-9 411.5 246)" />
+            <animate attributeName="opacity" dur="12s" repeatCount="indefinite" values="0;0;1;0;0;0;1;0;0;0;1;0;0;0;0" keyTimes="0.00000000;0.07333333;0.08666667;0.10000000;0.11333333;0.24666667;0.26000000;0.27333333;0.28666667;0.37333333;0.38666667;0.40000000;0.41333333;0.50000000;1.00000000" calcMode="discrete" />
+          </g>
+        </g>
+        <animate attributeName="opacity" dur="12s" repeatCount="indefinite" values="1;0;1" keyTimes="0.00000000;0.50000000;1.00000000" calcMode="discrete" />
+      </g>
+      <g id="loica-lupa-cabeza-frontal" opacity="0">
+        <path d="M388 369 C398 326 391 277 398 234 C408 189 444 155 478 153 C519 147 550 165 581 194 C625 235 648 307 651 395 L625 385 L611 402 L589 383 L569 399 L548 380 L526 398 L506 379 L481 397 L463 377 L446 391 L430 361 Z" fill="#7F7059" />
+        <path fill="#EA3E30" stroke="none" d="M426.0000 231.0000 C442.0000 197.0000 477.0000 184.0000 505.0000 190.0000 C534.0000 189.0000 566.0000 203.0000 582.0000 225.0000 C593.0000 251.0000 595.0000 281.0000 593.0000 302.0000 L589.0000 347.0000 L563.0000 375.0000 L539.0000 355.0000 L514.0000 377.0000 L489.0000 355.0000 L441.0000 348.0000 Z" />
+        <path stroke="#EDE3C5" stroke-width="24" d="M541.0000 225.0000 C560.0000 226.0000 577.0000 233.0000 592.0000 241.0000" />
+        <path d="M436 238 C451 229 467 224 480 224" stroke="#EDE3C5" stroke-width="19" opacity="1" />
+        <path d="M553 199 561 209 M584 226 592 240 M563 286 567 303 M597 306 603 323" stroke="#403A2D" stroke-width="7.4" />
+        <circle cy="249" r="23.5" fill="#302D24" stroke="none" cx="463.0000" />
+        <circle cy="241" r="6.4" fill="#FFFFFF" stroke="none" cx="457.0000" />
+        <g opacity="1.0000">
+          <circle cy="249" r="21.5" fill="#302D24" stroke="none" cx="560.0000" />
+          <circle cy="241" r="5.8" fill="#FFFFFF" stroke="none" cx="554.0000" />
+        </g>
+        <path d="M487.0000 277.0000 L513.0000 331.0000 L539.0000 277.0000 Z" fill="#C7BEA6" />
+        <path d="M513.0000 280.2400 L513.0000 326.6800" stroke-width="6.3" />
+        <animate attributeName="opacity" dur="12s" repeatCount="indefinite" values="0;1;0" keyTimes="0.00000000;0.50000000;1.00000000" calcMode="discrete" />
+      </g>
+    </g>
+    <g class="loica-lupa-still loica-bird">
+      <g>
+        <path d="M388 369 C398 326 391 277 398 234 C408 189 444 155 478 153 C519 147 550 165 581 194 C625 235 648 307 651 395 L625 385 L611 402 L589 383 L569 399 L548 380 L526 398 L506 379 L481 397 L463 377 L446 391 L430 361 Z" fill="#7F7059" />
+        <path fill="#EA3E30" stroke="none" d="M426.0000 231.0000 C442.0000 197.0000 477.0000 184.0000 505.0000 190.0000 C534.0000 189.0000 566.0000 203.0000 582.0000 225.0000 C593.0000 251.0000 595.0000 281.0000 593.0000 302.0000 L589.0000 347.0000 L563.0000 375.0000 L539.0000 355.0000 L514.0000 377.0000 L489.0000 355.0000 L441.0000 348.0000 Z" />
+        <path stroke="#EDE3C5" stroke-width="24" d="M541.0000 225.0000 C560.0000 226.0000 577.0000 233.0000 592.0000 241.0000" />
+        <path d="M436 238 C451 229 467 224 480 224" stroke="#EDE3C5" stroke-width="19" opacity="1" />
+        <path d="M553 199 561 209 M584 226 592 240 M563 286 567 303 M597 306 603 323" stroke="#403A2D" stroke-width="7.4" />
+        <circle cy="249" r="23.5" fill="#302D24" stroke="none" cx="463.0000" />
+        <circle cy="241" r="6.4" fill="#FFFFFF" stroke="none" cx="457.0000" />
+        <g opacity="1.0000">
+          <circle cy="249" r="21.5" fill="#302D24" stroke="none" cx="560.0000" />
+          <circle cy="241" r="5.8" fill="#FFFFFF" stroke="none" cx="554.0000" />
+        </g>
+        <path d="M487.0000 277.0000 L513.0000 331.0000 L539.0000 277.0000 Z" fill="#C7BEA6" />
+        <path d="M513.0000 280.2400 L513.0000 326.6800" stroke-width="6.3" />
+      </g>
+    </g>
+    <g class="loica-lupa-motion">
+      <g id="loica-lupa-ala-derecha" transform="rotate(0 625 392)">
+        <animateTransform attributeName="transform" type="rotate" dur="12s" repeatCount="indefinite" values="0 625 392;0 625 392;-2.5 625 392;0 625 392;0 625 392;-1.1 625 392;0 625 392;0 625 392" keyTimes="0;.10;.16;.24;.30;.37;.44;1" calcMode="spline" keySplines=".42 0 .58 1;.42 0 .58 1;.42 0 .58 1;.42 0 .58 1;.42 0 .58 1;.42 0 .58 1;.42 0 .58 1" />
+        <path d="M622 385 C674 397 711 440 738 501 C768 573 787 648 808 700 C734 690 678 656 640 596 C608 545 597 464 622 385 Z" fill="#68614A" />
+        <path d="M628 427 C658 502 707 604 771 665" stroke="#AEA185" stroke-width="7" />
+        <path d="M657 459 668 481 M685 511 695 533 M714 565 724 585 M741 616 752 638 M765 650 778 672" stroke="#EDE3C5" stroke-width="13.5" />
+        <path d="M635 464 643 485 M658 513 667 532 M686 560 699 580 M712 600 725 616" stroke="#413B2C" stroke-width="7" />
+      </g>
+    </g>
+    <g class="loica-lupa-still">
+      <g transform="rotate(0 625 392)">
+        <path d="M622 385 C674 397 711 440 738 501 C768 573 787 648 808 700 C734 690 678 656 640 596 C608 545 597 464 622 385 Z" fill="#68614A" />
+        <path d="M628 427 C658 502 707 604 771 665" stroke="#AEA185" stroke-width="7" />
+        <path d="M657 459 668 481 M685 511 695 533 M714 565 724 585 M741 616 752 638 M765 650 778 672" stroke="#EDE3C5" stroke-width="13.5" />
+        <path d="M635 464 643 485 M658 513 667 532 M686 560 699 580 M712 600 725 616" stroke="#413B2C" stroke-width="7" />
+      </g>
+    </g>
+  </g>
+  </g>
+  <g class="loica-sign">
+    <rect x="44" y="815" width="936" height="284" rx="30" fill="#FFFFFF" stroke="#302D24" stroke-width="8" />
+    <path d="M80 843H944" stroke="#EA3E30" stroke-width="7" stroke-linecap="round" />
+  </g>
+  <g transform="matrix(0.75 0 0 0.75 144 203.75)">
+  <g id="loica-lupa-patas" stroke="#302D24" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M511 731 488 815 M659 715 665 815" stroke-width="8" />
+    <path d="M488 814 468 832 M488 814 489 833 M488 814 512 829 M665 814 643 832 M665 814 666 833 M665 814 695 829" stroke-width="7.5" />
+  </g>
+  </g>
+  <g class="loica-message loica-message-drag" aria-hidden="true">
+    <text x="512" fill="#28251F" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="52" letter-spacing="1">
+      <tspan x="512" y="930">ARRASTRA AQUÍ</tspan>
+      <tspan x="512" y="993">EL PLANO QUE</tspan>
+      <tspan x="512" y="1056">QUIERES REVISAR</tspan>
+    </text>
+  </g>
+  <g class="loica-message loica-message-wait" aria-hidden="true">
+    <text x="512" fill="#28251F" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="50" letter-spacing="1">
+      <tspan x="512" y="930">TE ESTOY ESPERANDO,</tspan>
+      <tspan x="512" y="993">PUEDES PARTIR POR</tspan>
+      <tspan x="512" y="1056">UN SOLO PLANO...</tspan>
+    </text>
+  </g>
+  <g class="loica-message loica-message-shy" aria-hidden="true">
+    <text x="512" fill="#28251F" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="62" letter-spacing="2">
+      <tspan x="512" y="955">VAMOS,</tspan>
+      <tspan x="512" y="1033">NO SEAS TÍMIDO</tspan>
+    </text>
+  </g>
+</svg>
+        </button>
+        <p class="empty-msg" id="emptyMsg" hidden></p>
+      </div>
+      <div class="errorview" id="errorView" role="alert" hidden>
+        <div class="loica-err">
+<svg xmlns="http://www.w3.org/2000/svg" class="loica-error" viewBox="0 0 1000 920" fill="none" role="img" aria-labelledby="loica-error-title loica-error-desc">
+  <title id="loica-error-title">ERROR</title>
+  <desc id="loica-error-desc">Loica con cartel de ERROR en rojo y gesto de negación de cabeza de lado a lado, repetido con una pausa entre gestos.</desc>
+  <style>
+/* Negación horizontal: tres vaivenes y una pausa, cada 3.4 segundos. */
+.loica-error .loica-error-head {
+  transform-box: view-box;
+  transform-origin: 470px 300px;
+  animation: loica-error-shake 3.4s ease-in-out infinite;
+}
+@keyframes loica-error-shake {
+  0% { transform: translateX(0px) scaleX(1); }
+  10% { transform: translateX(-12px) scaleX(.92); }
+  20% { transform: translateX(12px) scaleX(1.02); }
+  30% { transform: translateX(-12px) scaleX(.92); }
+  40% { transform: translateX(12px) scaleX(1.02); }
+  50% { transform: translateX(-9px) scaleX(.95); }
+  60%, 100% { transform: translateX(0px) scaleX(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loica-error .loica-error-head { animation: none; transform: none; }
+}
+</style>
+  <g class="loica-bird" stroke="#28251F" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M511 461 589 445 647 602 610 609 601 625 554 611Z" fill="#625749" />
+    <path d="m561 493 47 114m-70-103 38 104" stroke="#B6AA91" stroke-width="9" />
+    <path d="M378 248C319 294 281 375 293 452 305 531 372 556 457 551 541 546 584 492 572 414 565 366 536 319 520 276 506 234 425 218 378 248Z" fill="#7E705B" />
+    <path d="M373 252C327 294 307 350 310 417 314 489 350 529 415 540 468 520 490 464 477 397 467 343 449 290 431 254Z" fill="#ED4133" stroke="none" />
+    <g class="loica-error-head">
+      <path d="M343 302C352 251 367 226 385 198 406 165 449 139 491 145 530 150 550 177 555 208L537 269 531 309 505 298 489 314 470 298 453 312 436 290 417 302 402 283 381 298 365 289Z" fill="#7E705B" />
+      <path d="M457 180C477 164 510 171 531 188L553 212 533 262 531 297 505 287 489 302 475 288 458 298 445 276 456 233Z" fill="#ED4133" stroke="none" />
+      <path d="M370 252C405 218 443 202 477 198" stroke="#F2E8CD" stroke-width="18" />
+      <path d="M536 200 702 208 535 250Z" fill="#C7BDA8" />
+      <path d="m548 221 154-13" stroke-width="5" />
+      <circle cx="494" cy="215" r="17" fill="#28251F" stroke="none" />
+      <circle cx="499" cy="209" r="5" fill="white" stroke="none" />
+      <g stroke="#3D382F" stroke-width="6">
+        <path d="m411 188 9-8m18-7 8-6m-47 65-7 11m33-18-6 11" />
+      </g>
+    </g>
+    <path d="M492 312C547 323 571 375 588 429L619 533C562 526 519 500 495 455 474 415 470 357 492 312Z" fill="#61594B" />
+    <path d="M495 342C512 389 535 441 572 477" stroke="#9D907A" stroke-width="6" />
+    <g stroke="#F2E8CD" stroke-width="9">
+      <path d="m538 364 7 19m7 24 9 23m9 22 11 20m9 19 9 18" />
+    </g>
+    <g stroke="#3D382F" stroke-width="6">
+      <path d="m358 347-4 14m16 28-3 13m-4 35 1 13m26 30 4 11m104-123 5 12m5 24 6 12m8 25 8 11" />
+    </g>
+    <path d="m410 548-13 60m108-65 15 65" />
+  </g>
+  <g class="loica-sign">
+    <rect x="60" y="609" width="880" height="253" rx="26" fill="white" stroke="#28251F" stroke-width="7" />
+    <path d="M92 631H908" stroke="#ED4133" stroke-width="5" stroke-linecap="round" />
+    <text x="500" y="777" fill="#ED4133" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="112" font-weight="800" letter-spacing="6">ERROR</text>
+  </g>
+  <g stroke="#28251F" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m397 605-19 14m19-14 18 14m-18-14-2 17m125-17-18 14m18-14 20 14m-20-14 2 17" />
+  </g>
+</svg>
+        </div>
+        <p class="err-msg" id="errMsg"></p>
+        <div class="btnrow" id="errBtns" hidden>
+          <button class="btn primary" id="nmAlign" type="button">Alinear con dos puntos</button>
+          <button class="btn" id="nmShow" type="button">Ver la comparación igual</button>
+        </div>
+        <p class="err-count" id="errCount"></p>
+      </div>
+      <a class="credit" href="https://www.vialag.com/" target="_blank" rel="noopener">Desarrollado por VialAG para la revisión de planos</a>
+      <span class="secreto" aria-hidden="true">Si encontraste esto eres un genio y me debes un almuerzo. Atte. Felipe Borquez</span>
+    </div>
+  </section>
+</div>
+
+<input type="file" id="fileAny" accept=".pdf,.dxf,.dwg,.zip,.json" multiple hidden>
+<input type="file" id="fileVer" accept=".pdf,.dxf,.dwg" hidden>
+<input type="file" id="fileRev" accept=".zip,.json,application/zip,application/json" hidden>
+
+<div class="dropzone" id="drop" hidden>
+  <div class="dz"><span class="dzk">+</span>Soltar aquí<small>Planos (PDF o DXF) o una revisión guardada (.zip)</small></div>
+</div>
+
+<dialog id="dlg">
+  <div class="dlg">
+    <header>
+      <h3>Alinear con dos puntos</h3>
+      <span class="hint" id="dlgHint">Marca el mismo cruce de ejes en las dos versiones. Primero el punto 1 en ambas, luego el punto 2.</span>
+    </header>
+    <div class="panes">
+      <div class="pane"><div class="ph"><strong id="dlgNameA">Versión anterior</strong><span class="mono" id="cntA">0 / 2</span></div><div class="viewport pick" id="vpA"></div></div>
+      <div class="pane"><div class="ph"><strong id="dlgNameB">Versión nueva</strong><span class="mono" id="cntB">0 / 2</span></div><div class="viewport pick" id="vpB"></div></div>
+    </div>
+    <footer>
+      <label class="check"><input type="checkbox" id="sameScale" checked> Las dos versiones están a la misma escala</label>
+      <div class="btnrow">
+        <button class="btn" id="dlgReset" type="button">Borrar puntos</button>
+        <button class="btn" id="dlgCancel" type="button">Cancelar</button>
+        <button class="btn primary" id="dlgApply" type="button" disabled>Aplicar</button>
+      </div>
+    </footer>
+  </div>
+</dialog>
+
+<dialog id="ask" class="ask">
+  <form method="dialog" class="askbox">
+    <p id="askMsg"></p>
+    <div class="btnrow">
+      <button class="btn" value="no" id="askNo">Cancelar</button>
+      <button class="btn primary" value="si" id="askYes">Aceptar</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="vendor/pdf.min.js"></script>
+<script src="vendor/pdf.worker.min.js"></script>
+<script src="vendor/dxf-parser.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/jszip.min.js"></script>
+<script src="js/motor.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
